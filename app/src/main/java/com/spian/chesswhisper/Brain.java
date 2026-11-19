@@ -48,6 +48,7 @@ public class Brain {
     State state = State.IDLE;
     public String status = "Press New game";
     public String big = "";
+    public String question = "";     // what it is asking right now (for the screen)
     private String myText = "";        // what to say for my move
     private String myExtra = null;     // opening name to add once
     private String enemyText = "";
@@ -71,12 +72,18 @@ public class Brain {
     public Brain(ChessCore core, Host host) { this.core = core; this.host = host; }
 
     // ================= buttons =================
+    private long lastUp = 0, lastDown = 0;
+    static final long DEBOUNCE_MS = 60;     // ignore key auto-repeat / double events
+
     public void volUp() {
+        long now = System.currentTimeMillis();
+        if (now - lastUp < DEBOUNCE_MS) return;
+        lastUp = now;
         switch (state) {
             case ENTER:
                 if (items.isEmpty()) return;
                 idx = (idx + 1) % items.size();
-                say(items.get(idx).say, items.get(idx).say);
+                say(items.get(idx).say, null);
                 break;
             case MY_CONFIRM: case ENEMY_CONFIRM:
                 repeatNow();
@@ -87,6 +94,9 @@ public class Brain {
     }
 
     public void volDown() {
+        long now = System.currentTimeMillis();
+        if (now - lastDown < DEBOUNCE_MS) return;
+        lastDown = now;
         downCount++;
         host.cancel(resolveDown);
         host.post(resolveDown, MULTI_MS);
@@ -163,7 +173,7 @@ public class Brain {
         thinkToken++;
         host.cancel(resolveDown); downCount = 0;
         stopRepeat();
-        items = new ArrayList<>();
+        items = new ArrayList<>(); question = "";
         state = State.IDLE;
     }
 
@@ -197,7 +207,7 @@ public class Brain {
     }
 
     private void waitMyConfirm() {
-        state = State.MY_CONFIRM;
+        state = State.MY_CONFIRM; question = "";
         status = "Play it, then press Volume DOWN";
         String t = myExtra != null ? myText + ". Opening: " + myExtra : myText;
         myExtra = null;
@@ -256,14 +266,16 @@ public class Brain {
             ask(second, null, new Picker() { public void pick(Object v2) {
                 if (letterFirst) pickRank = (Character) v2; else pickFile = (Character) v2;
                 squareChosen(ChessCore.square(pickFile, pickRank));
-            } });
-        } });
+            } }, letterFirst ? "Their move: row (number) · column " + letter(pickFile) : "Their move: column (letter) · row " + pickRank);
+        } }, letterFirst ? "Their move: column (letter)" : "Their move: row (number)");
     }
 
-    private void ask(List<Item> list, String prompt, Picker p) {
+    private void ask(List<Item> list, String prompt, Picker p) { ask(list, prompt, p, null); }
+    private void ask(List<Item> list, String prompt, Picker p, String label) {
         items = list; idx = 0; picker = p;
+        question = label != null ? label : (prompt != null ? prompt : question);
         String first = list.get(0).say;
-        say(prompt != null ? prompt + ". " + first : first, first);
+        say(prompt != null ? prompt + ". " + first : first, null);
         host.changed();
     }
 
@@ -309,7 +321,7 @@ public class Brain {
     }
 
     private void applyEnemy(String uci) {
-        items = new ArrayList<>();
+        items = new ArrayList<>(); question = "";
         ChessCore.Mv m = core.play(uci);
         if (m == null) { enemyTurn(); return; }
         String sq = letter(m.toSq().charAt(0)) + " " + m.toSq().charAt(1);
@@ -333,6 +345,9 @@ public class Brain {
     }
 
     // ================= undo / repeat =================
+    public void uiUndo() { if (busy()) undo(); }
+    public void uiRepeat() { if (busy()) repeatMyMove(); }
+
     void undo() {
         if (state == State.ENTER && stage > 0) {               // wrong letter / number / piece
             say("Back", "Back");
@@ -421,9 +436,28 @@ public class Brain {
     private void say(String speech, String shown) {
         if (shown != null && !shown.isEmpty()) big = shown.equals("OK") || shown.equals("Back") || shown.equals("Undo") ? big : shown;
         host.say(speech);
+        host.changed();               // keep the screen in sync with what is spoken
     }
 
     static String letter(char f) { return String.valueOf(Character.toUpperCase(f)); }
+
+    /** Move list like "1. e4 e5 2. Nf3" for the screen. */
+    public String movesText() {
+        StringBuilder sb = new StringBuilder();
+        List<ChessCore.Mv> h = core.history();
+        boolean startWhite = h.isEmpty() || h.get(0).white;
+        int n = 1;
+        for (int i = 0; i < h.size(); i++) {
+            ChessCore.Mv m = h.get(i);
+            if (m.white) sb.append(n).append(". ");
+            else if (i == 0 && !startWhite) sb.append(n).append("… ");
+            sb.append(m.san).append(' ');
+            if (!m.white) n++;
+        }
+        return sb.toString().trim();
+    }
+    public boolean isMyTurnUi() { return state == State.MY_CONFIRM || state == State.THINKING; }
+    public boolean isEntering() { return state == State.ENTER; }
 
     /** Item currently being offered (for the screen). */
     public String currentItem() { return state == State.ENTER && !items.isEmpty() ? items.get(idx).say : ""; }
