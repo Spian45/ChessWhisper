@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Chess Whisper</string>
+    <string name="key_service_name">Chess Whisper – hide volume slider</string>
+    <string name="key_service_desc">Lets Chess Whisper catch the volume buttons during a game so the volume slider does not pop up on screen. It only reads the volume buttons, and only while a game is running. Nothing else is read.</string>
 </resources>

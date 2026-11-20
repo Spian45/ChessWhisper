@@ -41,6 +41,7 @@ public class MainActivity extends Activity implements WhisperService.UiListener 
     private LinearLayout settingsBody, padRow;
     private Button sideW, sideB;
     private TextView settingsHeader;
+    private TextView hideStatus;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -157,6 +158,19 @@ public class MainActivity extends Activity implements WhisperService.UiListener 
         settingsHeader.setText(settingsBody.getVisibility() == View.VISIBLE ? "⚙  Settings  ▴" : "⚙  Settings  ▾");
         root.addView(set, cardLp());
 
+        // ---- hide volume slider ----
+        LinearLayout hide = card();
+        hide.addView(text("Hide the volume slider", 16, TEXT, true));
+        hideStatus = text("", 13, MUTED, false);
+        hide.addView(hideStatus);
+        hide.addView(text("Android shows the volume slider when you press the buttons with the screen on. Turn on “Chess Whisper – hide volume slider” in Accessibility to stop that. It only catches the volume buttons during a game.\nIf it’s greyed out: App info → ⋮ → Allow restricted settings, then try again.", 12, MUTED, false));
+        Button openAcc = bigButton("Open Accessibility settings", CARD2, TEXT, v -> {
+            try { startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)); } catch (Exception ignored) { }
+        });
+        LinearLayout.LayoutParams alp = topLp(10);
+        hide.addView(openAcc, alp);
+        root.addView(hide, cardLp());
+
         // ---- help ----
         LinearLayout help = card();
         help.addView(text("Buttons", 16, TEXT, true));
@@ -180,7 +194,12 @@ public class MainActivity extends Activity implements WhisperService.UiListener 
         setContentView(sv);
     }
 
-    @Override protected void onResume() { super.onResume(); WhisperService.setListener(this); onBrainChanged(); }
+    @Override protected void onResume() {
+        super.onResume(); WhisperService.setListener(this); onBrainChanged();
+        boolean on = KeyService.isOn();
+        hideStatus.setText(on ? "✅ On — no volume slider during games" : "Off — the slider will pop up when the screen is on");
+        hideStatus.setTextColor(on ? GREEN : MUTED);
+    }
     @Override protected void onPause() { WhisperService.setListener(null); super.onPause(); }
 
     /** With the app on screen, the keys come here first. */

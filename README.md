@@ -49,6 +49,14 @@ Build → Build App Bundle(s) / APK(s) → Build APK(s). Install
 Requirements: Android 7.0+ (API 24). First start asks for notification permission —
 allow it, it's how Android keeps the app alive with the screen off.
 
+## Hide the volume slider
+
+With the screen **on**, Android pops up the volume slider when you press the buttons.
+To stop that: in the app tap **Open Accessibility settings** → *Installed apps* →
+**Chess Whisper – hide volume slider** → On. (If it's greyed out: App info → ⋮ →
+*Allow restricted settings*.) It only catches the volume buttons, only during a game.
+With the screen **off** nothing shows anyway.
+
 ## Phone settings that help
 
 - Battery: set Chess Whisper to **Unrestricted / Don't optimize** (Xiaomi, Oppo, Vivo,
