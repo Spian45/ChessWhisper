@@ -53,6 +53,7 @@ public class Brain {
     private String myExtra = null;     // opening name to add once
     private String enemyText = "";
     private int thinkToken = 0;
+    private boolean enteringMine = false;   // entering MY real move (I played something else)
 
     // entering the friend's move
     private List<Item> items = new ArrayList<>();
@@ -104,7 +105,8 @@ public class Brain {
 
     private void onDown(int n) {
         if (state == State.IDLE || state == State.OVER) { if (n == 1 && state == State.OVER) say(status, status); return; }
-        if (n >= 3) { repeatMyMove(); return; }
+        if (n >= 4) { otherMove(); return; }
+        if (n == 3) { repeatMyMove(); return; }
         if (n == 2) { undo(); return; }
         switch (state) {
             case MY_CONFIRM:
@@ -113,7 +115,9 @@ public class Brain {
                 break;
             case ENEMY_CONFIRM:
                 stopRepeat(); persist(false); say("OK", "OK");
-                host.post(new Runnable() { public void run() { myTurn(); } }, 700);
+                final boolean wasMine = enteringMine;
+                enteringMine = false;
+                host.post(new Runnable() { public void run() { if (wasMine) enemyTurn(); else myTurn(); } }, 700);
                 break;
             case ENTER:
                 if (items.isEmpty()) return;
@@ -128,7 +132,7 @@ public class Brain {
 
     // ================= game control =================
     public void newGame(boolean iAmWhite) {
-        cancelAll();
+        cancelAll(); enteringMine = false;
         settings.iAmWhite = iAmWhite;
         core.reset(chess.TextIO.startPosFEN);
         spokenOpening = null;
@@ -139,7 +143,7 @@ public class Brain {
 
     /** Continue from the saved state. */
     public void resume(boolean pendingConfirm) {
-        cancelAll();
+        cancelAll(); enteringMine = false;
         spokenOpening = core.openingName();
         if (checkEnd()) return;
         final ChessCore.Mv last = core.last();
@@ -253,21 +257,41 @@ public class Brain {
     }
 
     // ================= friend's turn =================
-    private void enemyTurn() {
+    private void enemyTurn() { enteringMine = false; enterMove(); }
+
+    /** I didn't play the suggested move: take it back and let me enter what I really played. */
+    private void otherMove() {
+        ChessCore.Mv last = core.last();
+        boolean myMoveOnBoard = last != null && last.white == settings.iAmWhite
+                && (state == State.MY_CONFIRM || (state == State.ENTER && stage == 0 && !enteringMine));
+        boolean myTurnNow = core.whiteToMove() == settings.iAmWhite && (state == State.THINKING || state == State.MY_CONFIRM);
+        if (!myMoveOnBoard && !myTurnNow && !(state == State.ENTER && enteringMine)) { say("Only on your turn", null); return; }
+        cancelAll();
+        if (myMoveOnBoard) core.undo();
+        spokenOpening = core.openingName();
+        persist(false);
+        enteringMine = true;
+        say("OK. Enter the move you really played", "Enter your real move");
+        host.post(new Runnable() { public void run() { enterMove(); } }, 2200);
+    }
+    public void uiOtherMove() { if (busy()) otherMove(); }
+
+    private void enterMove() {
         if (checkEnd()) return;
         state = State.ENTER; stage = 0;
-        status = "Their move: Vol UP = next, Vol DOWN = choose";
+        final String who = enteringMine ? "Your move" : "Their move";
+        status = who + ": Vol UP = next, Vol DOWN = choose";
         final boolean letterFirst = !settings.numberFirst;
         List<Item> first = letterFirst ? letters() : numbers();
         final List<Item> second = letterFirst ? numbers() : letters();
-        ask(first, "Their move", new Picker() { public void pick(Object v) {
+        ask(first, who, new Picker() { public void pick(Object v) {
             if (letterFirst) pickFile = (Character) v; else pickRank = (Character) v;
             stage = 1;
             ask(second, null, new Picker() { public void pick(Object v2) {
                 if (letterFirst) pickRank = (Character) v2; else pickFile = (Character) v2;
                 squareChosen(ChessCore.square(pickFile, pickRank));
-            } }, letterFirst ? "Their move: row (number) · column " + letter(pickFile) : "Their move: column (letter) · row " + pickRank);
-        } }, letterFirst ? "Their move: column (letter)" : "Their move: row (number)");
+            } }, letterFirst ? who + ": row (number) · column " + letter(pickFile) : who + ": column (letter) · row " + pickRank);
+        } }, letterFirst ? who + ": column (letter)" : who + ": row (number)");
     }
 
     private void ask(List<Item> list, String prompt, Picker p) { ask(list, prompt, p, null); }
@@ -294,7 +318,7 @@ public class Brain {
         final List<ChessCore.Mv> cands = core.movesTo(sq);
         if (cands.isEmpty()) {
             say("No move there. Again", "Again");
-            host.post(new Runnable() { public void run() { enemyTurn(); } }, 1500);
+            host.post(new Runnable() { public void run() { enterMove(); } }, 1500);
             return;
         }
         LinkedHashSet<Character> types = new LinkedHashSet<>();
@@ -323,19 +347,21 @@ public class Brain {
     private void applyEnemy(String uci) {
         items = new ArrayList<>(); question = "";
         ChessCore.Mv m = core.play(uci);
-        if (m == null) { enemyTurn(); return; }
+        if (m == null) { enterMove(); return; }
         String sq = letter(m.toSq().charAt(0)) + " " + m.toSq().charAt(1);
         String from = letter(m.fromSq().charAt(0)) + " " + m.fromSq().charAt(1);
         String t;
-        if (m.shortCastle) t = "They castled short, king side";
-        else if (m.longCastle) t = "They castled long, queen side";
-        else if (m.captured != 0) t = ChessCore.name(m.piece) + " from " + from + ", takes your " + ChessCore.name(m.captured) + " on " + sq;
-        else t = ChessCore.name(m.piece) + " from " + from + ", to " + sq;
+        String who = enteringMine ? "You" : "They";
+        if (m.shortCastle) t = who + " castled short, king side";
+        else if (m.longCastle) t = who + " castled long, queen side";
+        else if (m.captured != 0) t = (enteringMine ? "You played " : "") + ChessCore.name(m.piece) + " from " + from + ", takes " + (enteringMine ? "their " : "your ") + ChessCore.name(m.captured) + " on " + sq;
+        else t = (enteringMine ? "You played " : "") + ChessCore.name(m.piece) + " from " + from + ", to " + sq;
         if (core.checkmate()) t += ", checkmate";
         else if (core.inCheck()) t += ", check";
         enemyText = t;
         String extra = newOpening();
-        big = "Them: " + bigText(m);
+        big = (enteringMine ? "You: " : "Them: ") + bigText(m);
+        if (enteringMine) { myText = describeMine(m); }
         state = State.ENEMY_CONFIRM;
         status = "Right? Vol DOWN = yes · Vol DOWN x2 = wrong";
         persist(true);
@@ -352,7 +378,19 @@ public class Brain {
         if (state == State.ENTER && stage > 0) {               // wrong letter / number / piece
             say("Back", "Back");
             items = new ArrayList<>();
-            host.post(new Runnable() { public void run() { enemyTurn(); } }, 800);
+            host.post(new Runnable() { public void run() { enterMove(); } }, 800);
+            return;
+        }
+        if (state == State.ENEMY_CONFIRM && enteringMine) {      // my entered move was wrong: enter it again
+            cancelAll(); core.undo(); persist(false); enteringMine = true;
+            say("Undo. Enter your move again", "Undo");
+            host.post(new Runnable() { public void run() { enterMove(); } }, 1500);
+            return;
+        }
+        if (state == State.ENTER && enteringMine) {              // changed my mind: back to the engine's suggestion
+            cancelAll(); enteringMine = false;
+            say("Back to my suggestion", "Back");
+            host.post(new Runnable() { public void run() { myTurn(); } }, 1200);
             return;
         }
         if (state == State.ENTER && stage == 0 && core.last() != null && core.last().white == settings.iAmWhite) {

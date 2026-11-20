@@ -11,6 +11,7 @@ enter your friend's moves with the **volume buttons**, phone in your pocket, scr
 | **Volume DOWN** | Choose this one / "yes, I played it" / "yes, that's their move" |
 | **Volume DOWN ×2** (quick) | Undo |
 | **Volume DOWN ×3** (quick) | Repeat your move |
+| **Volume DOWN ×4** (quick) | I played a different move (misheard / blunder) → enter what you really played |
 | Volume UP while it's waiting for "yes" | Say it again now |
 | Earbud play/pause tap | Same as Volume DOWN |
 

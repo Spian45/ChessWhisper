@@ -88,6 +88,9 @@ public class MainActivity extends Activity implements WhisperService.UiListener 
         small.addView(space(dp(10)));
         small.addView(chip("🔁 Repeat", v -> { WhisperService s = WhisperService.get(); if (s != null) s.brain().uiRepeat(); }), weight());
         root.addView(small, topLp(8));
+        Button other = chip("✋ I played a different move", v -> { WhisperService s = WhisperService.get(); if (s != null) s.brain().uiOtherMove(); });
+        style(other, 0xFF2A1F33, 0xFFD2B6FF);
+        root.addView(other, topLp(8));
 
         // ---- board ----
         LinearLayout boardCard = card();
@@ -161,6 +164,7 @@ public class MainActivity extends Activity implements WhisperService.UiListener 
         help.addView(helpRow("Vol DOWN", "Choose · “yes, I played it” · “yes, that’s their move”"));
         help.addView(helpRow("DOWN ×2", "Undo"));
         help.addView(helpRow("DOWN ×3", "Repeat my move"));
+        help.addView(helpRow("DOWN ×4", "I played a different move (misheard / blunder): take back the suggestion and enter what you really played"));
         help.addView(helpRow("Earbud tap", "Same as Vol DOWN"));
         help.addView(text("Castling: enter the square the king lands on (G or C). Works with the screen off — set battery to “Unrestricted” for this app.", 12, MUTED, false));
         root.addView(help, cardLp());
