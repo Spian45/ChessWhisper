@@ -146,13 +146,20 @@ public class WhisperService extends Service {
                     case KeyEvent.KEYCODE_MEDIA_PLAY: case KeyEvent.KEYCODE_MEDIA_PAUSE:
                         brain.volDown(); return true;              // earbud tap = choose / yes
                     case KeyEvent.KEYCODE_MEDIA_NEXT:
-                        brain.volUp(); return true;                // earbud next = next
+                        brain.volUp(); return true;                // earbud double tap (next track) = next
+                    case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+                        brain.uiUndo(); return true;               // earbud triple tap (previous track) = undo
                 }
                 return super.onMediaButtonEvent(i);
             }
+            @Override public void onPlay() { brain.volDown(); }
+            @Override public void onPause() { brain.volDown(); }
+            @Override public void onSkipToNext() { brain.volUp(); }
+            @Override public void onSkipToPrevious() { brain.uiUndo(); }
         });
         session.setPlaybackState(new PlaybackState.Builder()
-                .setActions(PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_SKIP_TO_NEXT)
+                .setActions(PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE
+                        | PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
                 .setState(PlaybackState.STATE_PLAYING, 0, 1f).build());
     }
 

@@ -165,7 +165,9 @@ public class MainActivity extends Activity implements WhisperService.UiListener 
         help.addView(helpRow("DOWN ×2", "Undo"));
         help.addView(helpRow("DOWN ×3", "Repeat my move"));
         help.addView(helpRow("DOWN ×4", "I played a different move (misheard / blunder): take back the suggestion and enter what you really played"));
-        help.addView(helpRow("Earbud tap", "Same as Vol DOWN"));
+        help.addView(helpRow("Earbud 1 tap", "Choose / yes (like Vol DOWN)"));
+        help.addView(helpRow("Earbud 2 taps", "Next (like Vol UP)"));
+        help.addView(helpRow("Earbud 3 taps", "Undo"));
         help.addView(text("Castling: enter the square the king lands on (G or C). Works with the screen off — set battery to “Unrestricted” for this app.", 12, MUTED, false));
         root.addView(help, cardLp());
 
